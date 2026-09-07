@@ -1,0 +1,8 @@
+jupyter>=1,<2
+numpy>=1.23,<2
+pandas>=1.5,<3
+scikit-learn>=1.2,<2
+sktime>=0.16,<1
+timm==0.9.16
+torch>=2.1,<2.6
+

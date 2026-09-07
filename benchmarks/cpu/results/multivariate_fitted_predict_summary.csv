@@ -1,0 +1,4 @@
+method,input_shape,scope,p50_ms,p95_ms,peak_process_rss_mib,fit_time_s,fit_peak_process_rss_mib,repetitions,warmup
+ROCKET,"[1,3,512]",already-fitted classifier predict including feature transform and Ridge prediction,47.84685,55.508035,344.08203125,4.4830829,388.9921875,100,20
+Hydra,"[1,3,512]",already-fitted classifier predict including feature transform and Ridge prediction,16.775,20.579415,544.42578125,1.6449867,561.265625,100,20
+QUANT,"[1,3,512]",already-fitted classifier predict including feature transform and ExtraTrees prediction,38.92445,49.14064,322.9765625,1.7524662,331.171875,100,20

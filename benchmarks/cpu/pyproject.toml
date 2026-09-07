@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.26,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tslimits-resource-benchmark"
+version = "0.1.0"
+description = "Reproducible resource measurements for frozen time-series foundation-model pipelines"
+readme = "README.md"
+requires-python = "==3.11.*"
+dependencies = [
+  "huggingface-hub==0.24.0",
+  "numpy==1.25.2",
+  "psutil>=6,<8",
+  "torch==2.5.1",
+]
+
+[project.optional-dependencies]
+cpu = [
+  "aeon>=1.1,<2",
+  "pandas>=2.2,<3",
+  "safetensors>=0.4,<1",
+  "scikit-learn>=1.5,<2",
+]
+models = [
+  "mantis-tsfm==1.1.0",
+  "momentfm==0.1.4",
+  "transformers==4.33.3",
+]
+legacy = [
+  "timm==0.9.16",
+  "pyyaml>=6,<7",
+]
+gpu = ["nvidia-ml-py>=12.535,<13"]
+test = ["pytest>=8,<9"]
+
+[project.scripts]
+tslimits-resource-bench = "tslimits_bench.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tslimits_bench"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

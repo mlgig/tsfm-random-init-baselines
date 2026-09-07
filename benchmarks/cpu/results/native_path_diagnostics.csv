@@ -1,0 +1,3 @@
+method,input_shape,input_layout,scope,p50_ms,p95_ms,peak_process_rss_mib,registered_fma_conv_gflops,repetitions,warmup,status
+NuTime legacy BYOL,"[1,1,176]","[B,C,T]",released univariate core representation after deterministic resize to 176,2.3675,5.522965,487.1796875,0.058978304,100,20,do not place in common C=3 table because a raw C>1 path creates non-pretrained channel embeddings
+UniTS x128 UWave source core,"[1,315,3]","[B,T,V]",released UWave source prompt/CLS core before target pooling or probe,36.4012,43.236495,409.87109375,0.385579008,100,20,do not place in common C=3,L=512 table because this is source-task-specific

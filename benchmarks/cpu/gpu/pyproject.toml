@@ -1,0 +1,20 @@
+[project]
+name = "tslimits-resource-benchmark-gpu"
+version = "0.1.0"
+requires-python = "==3.11.*"
+dependencies = [
+  "tslimits-resource-benchmark[models,legacy]",
+  "nvidia-ml-py>=12.535,<13",
+  "torch==2.5.1",
+  "torchvision==0.20.1",
+]
+
+[tool.uv.sources]
+tslimits-resource-benchmark = { path = "..", editable = true }
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true

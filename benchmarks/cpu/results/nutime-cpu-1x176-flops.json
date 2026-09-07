@@ -1,0 +1,35 @@
+{
+  "caveat": "Native released univariate path only; the public C>1 path adds non-pretrained channel embeddings. FlopCounterMode counts registered matrix-multiply/convolution operations only (two FLOPs per MAC).",
+  "input_layout": "[B,C,T]",
+  "input_shape": [
+    1,
+    1,
+    176
+  ],
+  "input_source": "synthetic-standard-normal",
+  "model": {
+    "checkpoint_sha256": "65543d55c6a9d30837b46b3809b7358a6ecb3e9702f4eaf01bfd68a96707f7a2",
+    "name": "nutime-legacy-byol",
+    "representation": "128-D normalized CLS feature; BYOL projector removed",
+    "source": "https://github.com/chenguolin/NuTime",
+    "source_revision": "9acdd3d0e82df0914217ef752fa3b95ec82cd960"
+  },
+  "operator_flops": {
+    "Global": {
+      "aten.addmm": 28852224,
+      "aten.bmm": 1769472,
+      "aten.convolution": 45056,
+      "aten.mm": 28311552
+    }
+  },
+  "output_shape": [
+    1,
+    128
+  ],
+  "registered_flops_per_forward": 58978304,
+  "registered_gflops_per_forward": 0.058978304,
+  "scope": "Loaded native core forward only; excludes model loading, input I/O, target pooling, probe fitting, and probe prediction.",
+  "torch_threads": 1,
+  "torch_version": "2.5.1+cpu",
+  "warmup": 0
+}

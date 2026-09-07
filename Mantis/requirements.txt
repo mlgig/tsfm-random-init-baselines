@@ -1,0 +1,7 @@
+aeon>=1.1,<2
+mantis-tsfm==1.1.0
+numpy==1.25.2
+pandas>=2.2,<3
+scikit-learn>=1.2,<2
+torch>=2.1,<2.6
+

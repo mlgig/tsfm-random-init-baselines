@@ -1,0 +1,9 @@
+gluonts>=0.14,<1
+numpy>=1.23,<2
+pandas>=1.5,<3
+pyyaml>=6,<7
+scikit-learn>=1.2,<2
+sktime>=0.16,<1
+timm>=0.9,<1
+torch>=2.0,<2.6
+

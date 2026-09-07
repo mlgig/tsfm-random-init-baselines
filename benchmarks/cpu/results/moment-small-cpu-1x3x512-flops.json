@@ -1,0 +1,34 @@
+{
+  "caveat": "PyTorch FlopCounterMode counts registered matrix-multiply, convolution, and related Torch operations, but omits operations such as normalization, softmax, activations, interpolation, indexing, and non-Torch code. Treat this as a reproducible partial diagnostic, not a complete architecture FLOP total, and do not compare it numerically with aeon ROCKET/Hydra/QUANT. Use measured CPU latency/RSS for cross-framework comparisons.",
+  "input_shape": [
+    1,
+    3,
+    512
+  ],
+  "input_source": "synthetic-standard-normal",
+  "model": {
+    "channels": 1,
+    "kind": "moment",
+    "length": 512,
+    "name": "moment-small",
+    "repo_id": "AutonLab/MOMENT-1-small",
+    "revision": "411e288267f82cce86296dbe4d6c8bc533cc162f",
+    "source": "huggingface"
+  },
+  "operator_flops": {
+    "Global": {
+      "aten.bmm": 150994944,
+      "aten.mm": 7249330176
+    }
+  },
+  "output_shape": [
+    1,
+    512
+  ],
+  "registered_flops_per_forward": 7400325120,
+  "registered_gflops_per_forward": 7.40032512,
+  "scope": "Loaded encoder forward only. Mantis applies the official single-channel backbone once per input channel before concatenation; MOMENT uses its released embedding reduction. Excludes input I/O, model loading, probe fitting, and probe prediction.",
+  "torch_threads": 1,
+  "torch_version": "2.5.1+cpu",
+  "warmup": 0
+}

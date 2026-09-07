@@ -1,0 +1,42 @@
+{
+  "cuda_max_allocated_mib": null,
+  "cuda_max_reserved_mib": null,
+  "gpu_energy_j": null,
+  "input_source": "synthetic-standard-normal",
+  "latency_ms_max": 166.6232,
+  "latency_ms_mean": 144.879565,
+  "latency_ms_median": 144.28645,
+  "latency_ms_min": 122.2059,
+  "latency_ms_p50": 144.28645,
+  "latency_ms_p95": 160.69212,
+  "metadata": {
+    "batch_shape": [
+      1,
+      1,
+      512
+    ],
+    "cpu": "Intel64 Family 6 Model 197 Stepping 2, GenuineIntel",
+    "device": "cpu",
+    "dtype": "float32",
+    "logical_cpu_count": 16,
+    "measurement_scope": "loaded-model forward only; excludes model loading, network download, probe fitting, and disk I/O",
+    "python_platform": "Windows-10-10.0.26100-SP0",
+    "torch_version": "2.5.1+cpu"
+  },
+  "model": {
+    "channels": 1,
+    "kind": "moment",
+    "length": 512,
+    "name": "moment-base",
+    "repo_id": "AutonLab/MOMENT-1-base",
+    "revision": "5e44b0ea26376a176360f87831124e018f876d96",
+    "source": "huggingface"
+  },
+  "process_rss_after_mib": 683.671875,
+  "process_rss_before_mib": 675.828125,
+  "process_rss_peak_mib": 683.671875,
+  "repetitions": 100,
+  "throughput_samples_per_s": 6.902284666578067,
+  "torch_threads": 1,
+  "warmup": 20
+}

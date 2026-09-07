@@ -1,0 +1,9 @@
+method,family,input_shape,input_layout,scope,p50_ms,p95_ms,peak_process_rss_mib,fit_time_s,registered_fma_conv_gflops,flop_coverage,repetitions,warmup
+Mantis-8M,TSFM,"[1,3,512]","[B,C,T]",released encoder plus channel-wise concatenation,18.6054,21.34723,321.109375,,0.873766272,partial Torch registered mm/addmm/bmm/convolution,100,20
+MantisV2,TSFM,"[1,3,512]","[B,C,T]",released encoder plus channel-wise concatenation,15.8774,18.84414,294.984375,,0.482086272,partial Torch registered mm/addmm/bmm/convolution,100,20
+MOMENT-small,TSFM,"[1,3,512]","[B,C,T]",released embedding encoder with mean reduction,82.4774,92.00209,398.5,,7.40032512,partial Torch registered mm/addmm/bmm/convolution,100,20
+MOMENT-base,TSFM,"[1,3,512]","[B,C,T]",released embedding encoder with mean reduction,354.9089,389.427615,697.28125,,33.070252032,partial Torch registered mm/addmm/bmm/convolution,50,10
+MOMENT-large,TSFM,"[1,3,512]","[B,C,T]",released embedding encoder with mean reduction,1354.1835,1380.2427,1592.31640625,,119.591141376,partial Torch registered mm/addmm/bmm/convolution; short diagnostic run,5,2
+ROCKET,aeon,"[1,3,512]","[N,C,T]",fitted feature transformation plus StandardScaler; final Ridge prediction excluded,46.83465,51.41302,344.0625,4.4830829,,not comparable across NumPy/Numba/scikit-learn path,100,20
+Hydra,aeon,"[1,3,512]","[N,C,T]",fitted Hydra transformation plus sparse scaler; final Ridge prediction excluded,14.26025,16.66458,544.2421875,1.6449867,,not comparable as a total; optional conv-only diagnostic is 0.028283904 GFLOP,100,20
+QUANT,aeon,"[1,3,512]","[N,C,T]",fitted QUANT transformation; final ExtraTrees prediction excluded,28.99255,46.353055,322.8671875,1.7524662,,not comparable; FFT/quantile work is not captured by the Torch counter,100,20

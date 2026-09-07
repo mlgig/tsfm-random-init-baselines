@@ -1,0 +1,38 @@
+{
+  "caveat": "Native released UWave source-task core only; it is not a generic arbitrary-UEA target adapter or end-to-end paper result. FlopCounterMode counts registered matrix-multiply/convolution operations only (two FLOPs per MAC).",
+  "input_layout": "[B,T,V]",
+  "input_shape": [
+    1,
+    315,
+    3
+  ],
+  "input_source": "synthetic-standard-normal",
+  "model": {
+    "checkpoint_sha256": "35d17336c8857d2bacefe403fe7f21ec33ffae9f67d497d569e6af0cb38b5474",
+    "name": "units-x128-source-task-core",
+    "representation": "[B,V,128] CLS feature before target pooling or external probe",
+    "source": "https://github.com/mims-harvard/UniTS/releases/tag/ckpt",
+    "source_dataset": "UWaveGestureLibrary",
+    "source_revision": "f8e5dfc71f6799164f30b090240a74ee70da01ca",
+    "source_task_id": "CLS_UWaveGestureLibrary"
+  },
+  "operator_flops": {
+    "Global": {
+      "aten.addmm": 23218176,
+      "aten.bmm": 221184,
+      "aten.convolution": 219414528,
+      "aten.mm": 142725120
+    }
+  },
+  "output_shape": [
+    1,
+    3,
+    128
+  ],
+  "registered_flops_per_forward": 385579008,
+  "registered_gflops_per_forward": 0.385579008,
+  "scope": "Loaded native core forward only; excludes model loading, input I/O, target pooling, probe fitting, and probe prediction.",
+  "torch_threads": 1,
+  "torch_version": "2.5.1+cpu",
+  "warmup": 0
+}

@@ -1,0 +1,42 @@
+{
+  "cuda_max_allocated_mib": null,
+  "cuda_max_reserved_mib": null,
+  "gpu_energy_j": null,
+  "input_source": "synthetic-standard-normal",
+  "latency_ms_max": 23.8866,
+  "latency_ms_mean": 18.854678,
+  "latency_ms_median": 18.6054,
+  "latency_ms_min": 16.3631,
+  "latency_ms_p50": 18.6054,
+  "latency_ms_p95": 21.34723,
+  "metadata": {
+    "batch_shape": [
+      1,
+      3,
+      512
+    ],
+    "cpu": "Intel64 Family 6 Model 197 Stepping 2, GenuineIntel",
+    "device": "cpu",
+    "dtype": "float32",
+    "logical_cpu_count": 16,
+    "measurement_scope": "loaded-model forward only; excludes model loading, network download, probe fitting, and disk I/O",
+    "python_platform": "Windows-10-10.0.26100-SP0",
+    "torch_version": "2.5.1+cpu"
+  },
+  "model": {
+    "channels": 1,
+    "kind": "mantis-v1",
+    "length": 512,
+    "name": "mantis-8m",
+    "repo_id": "paris-noah/Mantis-8M",
+    "revision": "bc7d5ab40c02133386a28e2c127f35c17c86901d",
+    "source": "huggingface"
+  },
+  "process_rss_after_mib": 321.09375,
+  "process_rss_before_mib": 260.6796875,
+  "process_rss_peak_mib": 321.109375,
+  "repetitions": 100,
+  "throughput_samples_per_s": 53.03723563987677,
+  "torch_threads": 1,
+  "warmup": 20
+}

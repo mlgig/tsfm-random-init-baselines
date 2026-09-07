@@ -1,0 +1,10 @@
+aeon>=1.1,<2
+huggingface-hub==0.24.0
+momentfm==0.1.4
+numpy==1.25.2
+pandas>=2.2,<3
+scikit-learn>=1.2,<2
+torch>=2.1,<2.6
+tqdm>=4.66,<5
+transformers==4.33.3
+

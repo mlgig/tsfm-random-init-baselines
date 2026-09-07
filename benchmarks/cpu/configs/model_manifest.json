@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "benchmark_note": "The public artifact revisions below were resolved on 2026-08-25. Replace them with the revisions used in the manuscript experiments before publishing a resource table.",
+  "models": [
+    {
+      "name": "moment-small",
+      "kind": "moment",
+      "source": "huggingface",
+      "repo_id": "AutonLab/MOMENT-1-small",
+      "revision": "411e288267f82cce86296dbe4d6c8bc533cc162f",
+      "channels": 1,
+      "length": 512
+    },
+    {
+      "name": "moment-base",
+      "kind": "moment",
+      "source": "huggingface",
+      "repo_id": "AutonLab/MOMENT-1-base",
+      "revision": "5e44b0ea26376a176360f87831124e018f876d96",
+      "channels": 1,
+      "length": 512
+    },
+    {
+      "name": "moment-large",
+      "kind": "moment",
+      "source": "huggingface",
+      "repo_id": "AutonLab/MOMENT-1-large",
+      "revision": "ca58581bc7bea2ebed4e80dc0a3e4b8b609c6ecc",
+      "channels": 1,
+      "length": 512
+    },
+    {
+      "name": "mantis-8m",
+      "kind": "mantis-v1",
+      "source": "huggingface",
+      "repo_id": "paris-noah/Mantis-8M",
+      "revision": "bc7d5ab40c02133386a28e2c127f35c17c86901d",
+      "channels": 1,
+      "length": 512
+    },
+    {
+      "name": "mantis-v2",
+      "kind": "mantis-v2",
+      "source": "huggingface",
+      "repo_id": "paris-noah/MantisV2",
+      "revision": "8f6ca35cb54ab14b120618943c6fca5ddf5a76a6",
+      "channels": 1,
+      "length": 512
+    },
+    {
+      "name": "units",
+      "kind": "external-adapter-required",
+      "source": "github-release",
+      "source_url": "https://github.com/mims-harvard/UniTS/releases/tag/ckpt",
+      "source_revision": "f8e5dfc71f6799164f30b090240a74ee70da01ca",
+      "asset": "units_x128_pretrain_checkpoint.pth",
+      "checkpoint_sha256": "35d17336c8857d2bacefe403fe7f21ec33ffae9f67d497d569e6af0cb38b5474",
+      "benchmark_script": "scripts/benchmark_units.py",
+      "synthetic_default_source_task": "CLS_UWaveGestureLibrary"
+    },
+    {
+      "name": "nutime",
+      "kind": "external-adapter-required",
+      "source": "github",
+      "source_url": "https://github.com/chenguolin/NuTime",
+      "source_revision": "9acdd3d0e82df0914217ef752fa3b95ec82cd960",
+      "asset": "ckpt/checkpoint_bias9.pth",
+      "checkpoint_sha256": "65543d55c6a9d30837b46b3809b7358a6ecb3e9702f4eaf01bfd68a96707f7a2",
+      "benchmark_script": "scripts/benchmark_nutime.py"
+    }
+  ]
+}
