@@ -1,6 +1,6 @@
 # Pretraining vs. Random Initialization in Time-Series Foundation Models
 
-Code for the experiments in our paper. Each method has one folder and one
+Code for the experiments in our Neurips 2026 workshop paper. Each method has one folder and one
 clear way to run it on the UEA multivariate archive.
 
 ```text
