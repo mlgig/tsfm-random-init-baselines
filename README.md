@@ -73,3 +73,17 @@ given on the command line.
 - [UniTS](https://github.com/mims-harvard/UniTS)
 - [NuTime](https://github.com/chenguolin/NuTime)
 - [aeon](https://github.com/aeon-toolkit/aeon)
+
+## Citation
+
+
+```bibtex
+@misc{pinar2026randominit,
+   title={Random Initialization as a Baseline for Time Series Foundation Models},
+   author={Pinar Sungu Isiacik and Georgiana Ifrim},
+   year={2026},
+   conference={{NeurIPS} 2026 Workshop on {TS-LIMITS}},
+   eprint={tba},
+   archivePrefix={arXiv},
+   primaryClass={cs.LG}
+}
