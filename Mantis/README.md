@@ -1,12 +1,9 @@
 # Mantis
 
-Clone the official Mantis source once, next to the model folders:
+This folder uses the public `mantis-tsfm==1.1.0` package. You do not need a
+separate Mantis checkout or a `MANTIS_REPO` setting.
 
-```bash
-git clone https://github.com/vfeofanov/mantis.git ../external/mantis
-```
-
-Then run the experiment through the Linux path wrapper:
+## Setup and run
 
 ```bash
 cd Mantis
@@ -16,11 +13,27 @@ bash run.sh \
   --model Mantis8M \
   --init random \
   --seed 0 \
-  --device cuda \
-  --output ../results/mantis_random_seed0.csv
+  --output ../results/Mantis/random_seed0.csv
 ```
 
-Use `--init pretrained` for the released checkpoint path used by the script.
-Set `MANTIS_REPO=/path/to/mantis` if the clone is elsewhere.
+The script uses CUDA when available, otherwise it uses CPU. Use `--device
+cuda` or `--device cpu` to choose a device yourself.
 
-Official code: <https://github.com/vfeofanov/mantis>
+Use `--model MantisV2` for MantisV2. Use `--init pretrained` for the released
+checkpoint. The script uses a fixed Hugging Face version by default; use
+`--revision` only when you intentionally need another release. The random
+setting seeds the official constructor and never loads checkpoint weights.
+
+## Data handling
+
+For unequal-length datasets, the script first right-zero-pads the train and
+test splits to one dataset-level maximum length. It then uses the existing
+linear interpolation step to reach `--target_len` (default: `512`). Random and
+pretrained runs use the same steps.
+
+Run the random setting with all paper seeds: `0`, `7`, `42`, `123`, and
+`2026`. Keep the full-precision CSV files for paper aggregation.
+
+## Source code
+
+- [Official Mantis repository](https://github.com/vfeofanov/mantis)

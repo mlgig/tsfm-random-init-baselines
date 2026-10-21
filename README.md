@@ -1,69 +1,135 @@
-# Pretraining vs. Random Initialization in Time-Series Foundation Models
+# Random Initialization as a Baseline for Time Series Foundation Models
 
-Code for the experiments in our Neurips 2026 workshop paper. Each method has one folder and one
-clear way to run it on the UEA multivariate archive.
+This repository contains the code for *Random Initialization as a Baseline for
+Time Series Foundation Models*, accepted at the NeurIPS 2026 TS-LIMITS
+workshop.
+
+## Abstract
+
+Time series foundation models are often used with pre-trained weights. This
+work asks a simple question: how much do those weights help compared with the
+same model built from random weights? We test MOMENT, Mantis, UniTS, and
+NuTime on multivariate time series classification datasets. We use frozen
+model features and the same downstream classifiers for both settings. We also
+compare the models with ROCKET, Hydra, and QUANT.
+
+## Resources
+
+- Paper link: coming soon.
+- [UEA Multivariate Time Series Classification Archive](https://www.timeseriesclassification.com/aeon-toolkit/Archives/Multivariate2018_ts.zip)
+- [Data notes](data/README.md)
+
+## Repository Structure
 
 ```text
-MOMENT/                       pretrained and random MOMENT runs
-Mantis/                       pretrained and random Mantis runs
-UniTS/                        pretrained and random UniTS runs
-NuTime/                       pretrained and random NuTime runs
-time-series-specific-models/  aeon ROCKET, Hydra, and QUANT runs
-data/                         UEA download command and data notes
-results/                      ignored outputs from local runs
+MOMENT/                       MOMENT Small, Base, and Large
+Mantis/                       Mantis 8M and MantisV2
+UniTS/                        UniTS runner and source wrapper
+NuTime/                       NuTime notebook runner
+time-series-specific-models/  ROCKET, Hydra, and QUANT
+data/                         UEA download script and dataset lists
+common/                       Shared data and classifier code
+scripts/                      Setup, validation, and result tools
+benchmarks/cpu/               Separate CPU and FLOP checks
 ```
+
+## Methods
+
+### Foundation Models
+
+- **MOMENT**: Small, Base, and Large models.
+- **Mantis**: Mantis 8M and MantisV2.
+- **UniTS**: runs from a fixed version of the official source code.
+- **NuTime**: runs from a fixed version of the official source code.
+
+Each model has a pre-trained run and a random-weight run. Random runs use the
+five seeds from the paper: `0`, `7`, `42`, `123`, and `2026`.
+
+### Time Series Methods
+
+- **ROCKET**
+- **Hydra**
+- **QUANT**
+
+These methods run through the aeon library.
 
 ## Data
 
-Download the UEA multivariate `.ts` archive once:
+Download the official UEA archive once:
 
 ```bash
 bash data/download_uea.sh
 export UEA_ROOT="$PWD/data/UEA"
 ```
 
-The command uses the official
-[Multivariate2018 `.ts` archive](https://www.timeseriesclassification.com/aeon-toolkit/Archives/Multivariate2018_ts.zip).
-The [UEA dataset page](https://www.timeseriesclassification.com/dataset.php)
-is the archive landing page.
+The archive is about 846 MiB and contains 30 datasets. The expected layout is:
 
-## Run a model
+```text
+$UEA_ROOT/<Dataset>/<Dataset>_TRAIN.ts
+$UEA_ROOT/<Dataset>/<Dataset>_TEST.ts
+```
 
-Every model folder has `setup.sh`, `run.sh`, its exact experiment code, and a
-short README. For example:
+Some datasets have time series with different lengths. The runners add zeros
+at the end only when a model needs a fixed input length. They use the same
+data path for pre-trained and random runs.
+
+The original experiment also used a local processed-data folder that is not in
+this repository. Keep new result files if you want to compare them with the
+published tables.
+
+## Usage
+
+Each method has its own README with setup and run commands. The usual steps
+are:
+
+1. Download the UEA data.
+2. Run `setup.sh` in the method folder.
+3. Run the method for each random seed and once with pre-trained weights.
+
+For example, to run MOMENT Base with random weights:
 
 ```bash
 cd MOMENT
 bash setup.sh
 bash run.sh --data_path "$UEA_ROOT" --model MOMENT-1-base \
   --init random --seed 0 --device cuda \
-  --output ../results/moment_random_seed0.csv
+  --output ../results/MOMENT-Base/random_seed0.csv
 ```
 
-For the three time-series-specific reference methods:
+The [MOMENT](MOMENT/README.md), [Mantis](Mantis/README.md),
+[UniTS](UniTS/README.md), [NuTime](NuTime/README.md), and
+[time-series methods](time-series-specific-models/README.md) READMEs have
+more details.
+
+## Results
+
+The original per-seed UEA result files are not stored in this repository. Once
+you have new run outputs, use the result tool below to build paper-style
+summary tables:
 
 ```bash
-cd time-series-specific-models
-bash setup.sh
-bash run_rocket.sh --data-root "$UEA_ROOT" --seed 42 --n-jobs 1 \
-  --output-dir ../results/rocket_seed42
+python scripts/aggregate_paper_results.py \
+  --input-root /path/to/paper-input \
+  --output-dir results/paper-summary
 ```
 
-See the README in the relevant folder for Mantis, UniTS, NuTime, Hydra, and
-QUANT commands.
+See [the result template](templates/paper-results/README.md) for the expected
+file layout.
 
-## Random initialization
+## References and Original Repositories
 
-The experiment code intentionally keeps the model-specific construction
-paths rather than pretending all four use an identical reset:
+- [UEA archive](https://www.timeseriesclassification.com/)
+- [MOMENT](https://github.com/moment-timeseries-foundation-model/moment)
+- [Mantis](https://github.com/vfeofanov/mantis)
+- [UniTS](https://github.com/mims-harvard/UniTS)
+- [NuTime](https://github.com/chenguolin/NuTime)
+- [aeon](https://github.com/aeon-toolkit/aeon)
 
-| Family | Random condition |
-| --- | --- |
-| Mantis | Fresh seeded model; no pretrained weights loaded. |
-| MOMENT | Loads the model path, then applies the script's module reset. |
-| UniTS | Fresh model, then applies the script's module reset. |
-| NuTime | Fresh model, then applies the notebook's module reset. |
+## Citation
 
-The separate `benchmarks/cpu/` directory contains the already-reported
-synthetic CPU/FLOP diagnostic. It is not the UEA accuracy runner and does not
-represent end-to-end deployment latency.
+Citation details will be added when the paper is publicly available.
+
+## License
+
+Please check the licenses of the original model repositories before using
+their code or weights.

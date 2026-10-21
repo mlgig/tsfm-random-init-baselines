@@ -1,9 +1,4 @@
-"""
-Mantis Zero-Shot Evaluation on UEA Multivariate Time Series Datasets
-- Loads datasets using load_from_tsfile
-- Extracts features using Mantis foundation model (pretrained OR random init)
-- Evaluates with SVM (GridSearchCV), LogisticRegression, RidgeClassifier, RandomForest
-"""
+"""Mantis frozen-representation evaluation on UEA multivariate datasets."""
 
 import os
 import sys
@@ -14,22 +9,22 @@ import warnings
 import argparse
 from pathlib import Path
 
-from aeon.datasets import load_from_ts_file
-from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression, RidgeClassifierCV
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from common.downstream import PROBE_ORDER, evaluate_probes
+from common.uea import load_uea_collection, pad_train_test_to_common_length, right_pad_collection
+from mantis.architecture import Mantis8M, MantisV2
+from mantis.trainer import MantisTrainer
+
+
+MANTIS_REVISIONS = {
+    "Mantis8M": "bc7d5ab40c02133386a28e2c127f35c17c86901d",
+    "MantisV2": "8f6ca35cb54ab14b120618943c6fca5ddf5a76a6",
+}
 
 warnings.filterwarnings("ignore")
-
-# ─── Add mantis source to path ───
-MANTIS_REPO = os.path.expanduser("~/workspace_pinar/mantis")
-sys.path.insert(0, MANTIS_REPO)
-
-from src.mantis.architecture import MantisV2, Mantis8M
-from src.mantis.trainer.trainer import MantisTrainer
 
 
 def set_seed(seed: int):
@@ -40,63 +35,11 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 
-def resize_to_multiple_of_32(X: np.ndarray, target_len: int = 512) -> np.ndarray:
-    """Resize time series to a length that is a multiple of 32."""
-    X_tensor = torch.tensor(X, dtype=torch.float)
+def resize_to_multiple_of_32(X, target_len: int = 512) -> np.ndarray:
+    """Right-pad ragged UEA cases, then interpolate every case to ``target_len``."""
+    X_tensor = torch.tensor(right_pad_collection(X), dtype=torch.float)
     X_resized = F.interpolate(X_tensor, size=target_len, mode='linear', align_corners=False)
     return X_resized.numpy()
-
-
-def get_classifiers():
-    """Return dict of classifier name -> (pipeline, param_grid) for GridSearchCV."""
-    classifiers = {}
-
-    # SVM with GridSearchCV
-    classifiers["SVM"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("svm", SVC(kernel="rbf", random_state=42))
-        ]),
-        "param_grid": {
-            "svm__C": [0.01, 0.1, 1.0, 10.0, 100.0],
-            "svm__gamma": ["scale", "auto"],
-        },
-        "use_gridsearch": False,
-    }
-
-    # Logistic Regression with GridSearchCV
-    classifiers["LogReg"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("logreg", LogisticRegression(max_iter=2000, random_state=42))
-        ]),
-        "param_grid": {
-            "logreg__C": [0.01, 0.1, 1.0, 10.0, 100.0],
-        },
-        "use_gridsearch": True,
-    }
-
-    # RidgeClassifierCV (built-in CV, no GridSearch needed)
-    classifiers["Ridge"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("ridge", RidgeClassifierCV(alphas=np.logspace(-3, 3, 10)))
-        ]),
-        "param_grid": None,
-        "use_gridsearch": False,
-    }
-
-    # Random Forest
-    classifiers["RF"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("rf", RandomForestClassifier(n_estimators=200, random_state=42))
-         ]),
-        "param_grid": None,
-        "use_gridsearch": False,
-    }
-
-    return classifiers
 
 
 def evaluate_dataset(dataset_name, data_path, model, device, target_len=512):
@@ -109,10 +52,11 @@ def evaluate_dataset(dataset_name, data_path, model, device, target_len=512):
         return None
 
     # Load data
-    X_train, y_train = load_from_ts_file(train_file)
-    X_test, y_test = load_from_ts_file(test_file)
+    X_train, y_train = load_uea_collection(train_file)
+    X_test, y_test = load_uea_collection(test_file)
 
     # Resize to target_len (must be multiple of 32)
+    X_train, X_test = pad_train_test_to_common_length(X_train, X_test)
     X_train = resize_to_multiple_of_32(X_train, target_len)
     X_test = resize_to_multiple_of_32(X_test, target_len)
 
@@ -120,36 +64,15 @@ def evaluate_dataset(dataset_name, data_path, model, device, target_len=512):
     Z_train = model.transform(X_train)
     Z_test = model.transform(X_test)
 
-    # Evaluate classifiers
-    classifiers = get_classifiers()
+    probe_results = evaluate_probes(Z_train, y_train, Z_test, y_test)
     results = {}
-
-    for clf_name, clf_config in classifiers.items():
-        try:
-            if clf_config["use_gridsearch"]:
-                gs = GridSearchCV(
-                    clf_config["pipeline"],
-                    clf_config["param_grid"],
-                    cv=5,
-                    scoring="accuracy",
-                    n_jobs=-1,
-                    refit=True,
-                )
-                gs.fit(Z_train, y_train)
-                y_pred = gs.predict(Z_test)
-                acc = np.mean(y_test == y_pred)
-                print(f"  {clf_name}: {acc:.4f} (best params: {gs.best_params_})")
-            else:
-                pipe = clf_config["pipeline"]
-                pipe.fit(Z_train, y_train)
-                y_pred = pipe.predict(Z_test)
-                acc = np.mean(y_test == y_pred)
-                print(f"  {clf_name}: {acc:.4f}")
-
-            results[clf_name] = acc
-        except Exception as e:
-            print(f"  {clf_name}: FAILED — {e}")
-            results[clf_name] = np.nan
+    for clf_name in PROBE_ORDER:
+        probe = probe_results[clf_name]
+        results[clf_name] = probe["accuracy"]
+        if probe["error"]:
+            print(f"  {clf_name}: FAILED — {probe['error']}")
+        else:
+            print(f"  {clf_name}: {probe['accuracy']:.4f} (best params: {probe['best_params']})")
 
     return results
 
@@ -159,12 +82,15 @@ def main():
     parser.add_argument(
         "--data_path",
         type=str,
-        default=os.path.expanduser(
-            "/home/pinar/workspace_pinar/tsfm/cross_corr/Multivariate_ts_length_fixed"
-        ),
+        required=True,
         help="Path to UEA dataset root (each subdirectory = one dataset)",
     )
-    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda" if torch.cuda.is_available() else "cpu",
+        help="Torch device (defaults to CUDA when available, otherwise CPU)",
+    )
     parser.add_argument("--target_len", type=int, default=512)
     parser.add_argument(
         "--datasets",
@@ -194,12 +120,23 @@ def main():
         help="Which Mantis architecture to use",
     )
     parser.add_argument(
+        "--revision",
+        type=str,
+        default=None,
+        help="Hugging Face checkpoint revision (defaults to the camera-ready pinned revision)",
+    )
+    parser.add_argument(
         "--output",
         type=str,
         default=None,
         help="Output CSV file for results (default: auto-named based on init/seed/model)",
     )
     args = parser.parse_args()
+
+    if args.target_len <= 0 or args.target_len % 32:
+        parser.error("--target_len must be a positive multiple of 32 for Mantis")
+    if args.device.startswith("cuda") and not torch.cuda.is_available():
+        parser.error("CUDA was requested but is not available; pass --device cpu")
 
     # ─── Set seed BEFORE building the network so random init is reproducible ───
     set_seed(args.seed)
@@ -213,10 +150,15 @@ def main():
     else:
         network = Mantis8M(device=args.device)
         hf_id = "paris-noah/Mantis-8M"
+    revision = args.revision or MANTIS_REVISIONS[args.model]
 
     if args.init == "pretrained":
-        network = network.from_pretrained(hf_id)
-        print(f"  Loaded pretrained weights from {hf_id}")
+        # Mantis8M exposes a classmethod loader, so explicitly pass the device
+        # rather than relying on the instance created immediately above.
+        network = network.from_pretrained(
+            hf_id, revision=revision, device=args.device
+        )
+        print(f"  Loaded pretrained weights from {hf_id}@{revision}")
     else:
         # Random init: keep the freshly instantiated weights, just move to device + eval mode
         network = network.to(args.device)
@@ -265,7 +207,9 @@ def main():
         df = pd.DataFrame(all_results).T
         df.index.name = "Dataset"
         df.loc["MEAN"] = df.mean()
-        df.to_csv(args.output, float_format="%.4f")
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(output_path, float_format="%.17g")
         print(f"\nResults saved to {args.output}")
         print(f"\n{'='*60}")
         print(df.to_string(float_format=lambda x: f"{x:.4f}"))

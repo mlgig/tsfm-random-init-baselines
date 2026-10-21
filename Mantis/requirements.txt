@@ -1,7 +1,11 @@
 aeon>=1.1,<2
 mantis-tsfm==1.1.0
+# `datasets>=5` resolves to PyArrow builds that require NumPy 2, while the
+# runner intentionally uses NumPy 1.25 for the surrounding UEA toolchain.
+# Mantis only requires the stable Dataset API available in 4.0.
+datasets==4.0.0
+pyarrow==19.0.1
 numpy==1.25.2
 pandas>=2.2,<3
 scikit-learn>=1.2,<2
 torch>=2.1,<2.6
-

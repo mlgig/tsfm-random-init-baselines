@@ -1,0 +1,25 @@
+# The Table 3 cross-method subset: all UEA datasets except the six listed in Table 4.
+ArticularyWordRecognition
+AtrialFibrillation
+BasicMotions
+CharacterTrajectories
+Cricket
+EigenWorms
+Epilepsy
+ERing
+EthanolConcentration
+FingerMovements
+HandMovementDirection
+Handwriting
+Heartbeat
+JapaneseVowels
+Libras
+LSST
+MotorImagery
+NATOPS
+PhonemeSpectra
+RacketSports
+SelfRegulationSCP1
+SelfRegulationSCP2
+SpokenArabicDigits
+UWaveGestureLibrary

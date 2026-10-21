@@ -14,17 +14,28 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--data-root", type=Path, required=True)
-    parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--nutime-root", type=Path, required=True)
+    parser.add_argument("--checkpoint", type=Path)
+    parser.add_argument("--results", type=Path, required=True)
     parser.add_argument("--init", choices=["pretrained", "random"], required=True)
     parser.add_argument("--seed", type=int, required=True)
     args = parser.parse_args()
+    if args.init == "pretrained" and args.checkpoint is None:
+        parser.error("--checkpoint is required when --init pretrained")
 
     notebook = json.loads((HERE / "nutime_random.ipynb").read_text(encoding="utf-8"))
     replacements = {
         'INIT = "pretrained"': f"INIT = {args.init!r}",
         "SEED = 0": f"SEED = {args.seed}",
-        'checkpoint_path = "ckpt/checkpoint_bias9.pth"': f"checkpoint_path = {str(args.checkpoint.resolve())!r}",
+        'checkpoint_path = "ckpt/checkpoint_bias9.pth"': (
+            f"checkpoint_path = {str(args.checkpoint.resolve())!r}"
+            if args.checkpoint is not None
+            else "checkpoint_path = None"
+        ),
         'base_data_dir = "dataset"': f"base_data_dir = {str(args.data_root.resolve())!r}",
+        'results_path = "nutime_results.csv"': f"results_path = {str(args.results.resolve())!r}",
+        'REPOSITORY_ROOT = ""': f"REPOSITORY_ROOT = {str(HERE.parent)!r}",
+        'NUTIME_SOURCE_ROOT = ""': f"NUTIME_SOURCE_ROOT = {str(args.nutime_root.resolve())!r}",
     }
     text = "\n".join(
         "".join(cell.get("source", []))

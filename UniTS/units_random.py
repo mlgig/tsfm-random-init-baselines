@@ -1,50 +1,25 @@
-"""
-UniTS frozen feature extraction + multi-classifier probe on UEA datasets.
-- Pretrained: loads weights from --ckpt
-- Random: skips checkpoint, applies Xavier reset_weights with --seed
-
-Random init uses the same reset_weights strategy as the MOMENT / Mantis / NuTime
-random-init baselines, for fair comparison across foundation models.
-
-Classifiers: SVM (GridSearch), LogReg (GridSearch), RidgeClassifierCV, RandomForest.
-"""
+"""UniTS frozen-representation evaluation on UEA multivariate datasets."""
 import os
 import sys
 import csv
 import yaml
 import argparse
+from collections.abc import Mapping
+from pathlib import Path
 import numpy as np
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
-from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression, RidgeClassifierCV
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import accuracy_score, f1_score
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from common.downstream import PROBE_ORDER, evaluate_probes
 
 # UniTS repo imports
 from models.UniTS import Model as UniTSModel
 from data_provider.data_factory import data_provider
 from types import SimpleNamespace
-
-
-# Example invocations:
-#
-# Pretrained:
-#   python svm_random.py \
-#     --ckpt /home/pinar/workspace_pinar/UniTS/checkpoints/units_x64_supervised_checkpoint.pth \
-#     --yaml data_provider/fewshot_new_task.yaml \
-#     --init random --seed 0
-#
-# Random init (same seeds as Mantis / MOMENT / NuTime):
-#   python units_feature_svm.py \
-#     --yaml data_provider/uea_zeroshot.yaml \
-#     --init random --seed 42
-
-# Select a GPU outside the script, for example: CUDA_VISIBLE_DEVICES=0 bash scripts/run_units.sh ...
 
 
 # ═══════════════════════════════════════════════════════════
@@ -59,28 +34,56 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 
-def reset_weights(m):
+def load_pretrained_weights(model: torch.nn.Module, checkpoint: str | Path) -> None:
+    """Load a public UniTS checkpoint and make partial target-task loading explicit.
+
+    Release artifacts use either a bare DataParallel state dictionary or a
+    ``student``/``state_dict`` wrapper.  A target-task YAML intentionally has
+    different prompt and class-token entries from the source training YAML, so
+    only shape-compatible tensors can be transferred.  Reject a checkpoint
+    that would otherwise silently load no representation weights.
     """
-    Re-initialize a module's weights randomly.
-    - Linear / Conv1d / Conv2d: Xavier uniform, bias zeroed
-    - LayerNorm: weight=1, bias=0
-    - BatchNorm: weight=1, bias=0 (running stats reset)
-    - Embedding: Xavier uniform
-    """
-    if isinstance(m, (nn.Linear, nn.Conv1d, nn.Conv2d)):
-        nn.init.xavier_uniform_(m.weight.data)
-        if m.bias is not None:
-            m.bias.data.zero_()
-    elif isinstance(m, nn.LayerNorm):
-        m.weight.data.fill_(1.0)
-        m.bias.data.zero_()
-    elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
-        m.weight.data.fill_(1.0)
-        m.bias.data.zero_()
-        m.running_mean.zero_()
-        m.running_var.fill_(1.0)
-    elif isinstance(m, nn.Embedding):
-        nn.init.xavier_uniform_(m.weight.data)
+    checkpoint_path = Path(checkpoint).expanduser().resolve()
+    raw = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+    if not isinstance(raw, Mapping):
+        raise TypeError(f"{checkpoint_path} is not a UniTS state dictionary")
+
+    for wrapper in ("state_dict", "model", "student"):
+        candidate = raw.get(wrapper)
+        if isinstance(candidate, Mapping):
+            raw = candidate
+            break
+
+    state = {
+        str(key).removeprefix("module."): value
+        for key, value in raw.items()
+        if isinstance(value, torch.Tensor)
+    }
+    if not state:
+        raise ValueError(f"{checkpoint_path} contains no tensor state")
+
+    target_state = model.state_dict()
+    compatible = {
+        key: value
+        for key, value in state.items()
+        if key in target_state and target_state[key].shape == value.shape
+    }
+    mismatched = [
+        key for key, value in state.items()
+        if key in target_state and target_state[key].shape != value.shape
+    ]
+    if not compatible:
+        raise RuntimeError(
+            f"{checkpoint_path} has no tensors compatible with this UniTS architecture. "
+            "Check --d_model, --e_layers, --prompt_num, --patch_len, --stride, and the task YAML."
+        )
+
+    loaded = model.load_state_dict(compatible, strict=False)
+    print(
+        "  Loaded "
+        f"{len(compatible)}/{len(state)} checkpoint tensors from {checkpoint_path} "
+        f"({len(loaded.missing_keys)} target-only, {len(mismatched)} shape-mismatched skipped)"
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -105,7 +108,7 @@ def build_args(task_cfg, global_args):
         target="OT",
         freq="h",
         batch_size=64,
-        num_workers=4,
+        num_workers=global_args.num_workers,
         prompt_num=global_args.prompt_num,
         patch_len=global_args.patch_len,
         stride=global_args.stride,
@@ -172,94 +175,27 @@ def extract_features(model, loader, device, feat_store, task_id=0):
 
 
 # ═══════════════════════════════════════════════════════════
-# Classifiers (same set used across Mantis / MOMENT / NuTime)
+# Classifiers (the shared camera-ready protocol)
 # ═══════════════════════════════════════════════════════════
 
-def get_classifiers():
-    classifiers = {}
-
-    # SVM (RBF) — GridSearch over C and gamma
-    classifiers["SVM"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("svm", SVC(kernel="rbf", random_state=42)),
-        ]),
-        "param_grid": {
-            "svm__C": [0.1, 1, 10, 100],
-            "svm__gamma": ["scale", 0.01, 0.001],
-        },
-        "use_gridsearch": True,
-    }
-
-    # Logistic Regression — GridSearch over C
-    classifiers["LogReg"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("logreg", LogisticRegression(max_iter=2000, random_state=42)),
-        ]),
-        "param_grid": {"logreg__C": [0.1, 1, 10]},
-        "use_gridsearch": True,
-    }
-
-    # RidgeClassifierCV — built-in CV over alphas
-    classifiers["Ridge"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("ridge", RidgeClassifierCV(alphas=np.logspace(-3, 3, 10))),
-        ]),
-        "param_grid": None,
-        "use_gridsearch": False,
-    }
-
-    # Random Forest
-    classifiers["RF"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("rf", RandomForestClassifier(n_estimators=200, random_state=42)),
-        ]),
-        "param_grid": None,
-        "use_gridsearch": False,
-    }
-
-    return classifiers
-
-
-def fit_and_score(tr_x, tr_y, te_x, te_y, n_splits=3):
+def fit_and_score(tr_x, tr_y, te_x, te_y):
     """Fit all classifiers, return dict {clf_name: {'acc':..., 'mf1':..., 'best_params':...}}."""
-    if tr_x.ndim > 2:
-        tr_x = tr_x.reshape(tr_x.shape[0], -1)
-        te_x = te_x.reshape(te_x.shape[0], -1)
-
-    classifiers = get_classifiers()
+    probe_results = evaluate_probes(tr_x, tr_y, te_x, te_y)
     out = {}
-    for clf_name, cfg in classifiers.items():
-        try:
-            if cfg["use_gridsearch"] and n_splits >= 2:
-                gs = GridSearchCV(
-                    cfg["pipeline"],
-                    cfg["param_grid"],
-                    cv=n_splits,
-                    scoring="accuracy",
-                    n_jobs=-1,
-                    refit=True,
-                )
-                gs.fit(tr_x, tr_y)
-                y_pred = gs.predict(te_x)
-                best = gs.best_params_
-            else:
-                pipe = cfg["pipeline"]
-                pipe.fit(tr_x, tr_y)
-                y_pred = pipe.predict(te_x)
-                best = None
-
-            acc = accuracy_score(te_y, y_pred)
-            mf1 = f1_score(te_y, y_pred, average="macro")
-            out[clf_name] = {"acc": acc, "mf1": mf1, "best_params": best}
-            best_str = f" | best: {best}" if best is not None else ""
-            print(f"    {clf_name:7s} Acc={acc:.4f} MF1={mf1:.4f}{best_str}")
-        except Exception as e:
-            print(f"    {clf_name:7s} FAILED — {type(e).__name__}: {e}")
-            out[clf_name] = {"acc": float("nan"), "mf1": float("nan"), "best_params": None}
+    for clf_name in PROBE_ORDER:
+        probe = probe_results[clf_name]
+        out[clf_name] = {
+            "acc": probe["accuracy"],
+            "mf1": probe["macro_f1"],
+            "best_params": probe["best_params"],
+        }
+        if probe["error"]:
+            print(f"    {clf_name:7s} FAILED — {probe['error']}")
+        else:
+            print(
+                f"    {clf_name:7s} Acc={probe['accuracy']:.4f} "
+                f"MF1={probe['macro_f1']:.4f} | best: {probe['best_params']}"
+            )
 
     return out
 
@@ -281,9 +217,11 @@ def main():
     ap.add_argument("--e_layers", type=int, default=3)
     ap.add_argument("--d_model", type=int, default=64)
     ap.add_argument("--n_heads", type=int, default=8)
+    ap.add_argument("--num-workers", type=int, default=0,
+                    help="DataLoader workers; 0 is the most portable default")
     ap.add_argument("--init", type=str, default="pretrained",
                     choices=["pretrained", "random"],
-                    help="Use pretrained checkpoint or random init (Xavier reset_weights)")
+                    help="Use a pretrained checkpoint or a fresh, seeded official initialization")
     ap.add_argument("--seed", type=int, default=42,
                     help="Random seed (only relevant for --init random)")
     g_args = ap.parse_args()
@@ -325,19 +263,9 @@ def main():
     model = UniTSModel(model_configs, configs_list).to(device)
 
     if g_args.init == "pretrained":
-        sd = torch.load(g_args.ckpt, map_location=device)
-        if "state_dict" in sd:
-            sd = sd["state_dict"]
-        elif "model" in sd:
-            sd = sd["model"]
-        sd = {k.replace("module.", ""): v for k, v in sd.items()}
-        model.load_state_dict(sd, strict=False)
-        print(f"  Loaded pretrained weights from {g_args.ckpt}")
+        load_pretrained_weights(model, g_args.ckpt)
     else:
-        # Re-seed right before reset so the same seed -> same random weights
-        set_seed(g_args.seed)
-        model.apply(reset_weights)
-        print(f"  Applied reset_weights (Xavier init, seed={g_args.seed})")
+        print(f"  Using fresh official initialization (seed={g_args.seed}); no checkpoint loaded")
 
     model.eval()
 
@@ -361,18 +289,24 @@ def main():
     target.register_forward_hook(hook)
 
     # ─── Evaluate per task ───
-    CLF_NAMES = ["SVM", "LogReg", "Ridge", "RF"]
+    output_path = Path(g_args.out).expanduser().resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    g_args.out = str(output_path)
+
+    CLF_NAMES = list(PROBE_ORDER)
     results = []
     for idx, (task_name, task_cfg) in enumerate(tasks.items()):
         print(f"\n=== {task_name} ===")
         try:
-            _, tr_loader = get_loader(task_cfg, "TRAIN", g_args)
-            _, te_loader = get_loader(task_cfg, "TEST", g_args)
+            # The upstream provider uses lowercase values to select evaluation
+            # batching and avoid dropping a final incomplete test batch.
+            _, tr_loader = get_loader(task_cfg, "train", g_args)
+            _, te_loader = get_loader(task_cfg, "test", g_args)
 
             tr_x, tr_y = extract_features(model, tr_loader, device, feat_store, task_id=idx)
             te_x, te_y = extract_features(model, te_loader, device, feat_store, task_id=idx)
 
-            clf_results = fit_and_score(tr_x, tr_y, te_x, te_y, n_splits=3)
+            clf_results = fit_and_score(tr_x, tr_y, te_x, te_y)
 
             row = {
                 "dataset": task_cfg["dataset"],
@@ -383,8 +317,8 @@ def main():
             for c in CLF_NAMES:
                 row[f"{c}_acc"] = clf_results[c]["acc"]
                 row[f"{c}_mf1"] = clf_results[c]["mf1"]
-            # Keep SVM best params for reference
-            svm_best = clf_results["SVM"]["best_params"] or {}
+            # Keep the RBF-SVM best parameters for reference.
+            svm_best = clf_results["RBF_SVM"]["best_params"] or {}
             row["best_C"] = svm_best.get("svm__C")
             row["best_gamma"] = svm_best.get("svm__gamma")
 

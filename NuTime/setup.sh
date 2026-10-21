@@ -2,5 +2,5 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-uv venv "${HERE}/.venv" --python 3.11
-uv pip install --python "${HERE}/.venv/bin/python" -r "${HERE}/requirements.txt"
+ROOT="$(cd "${HERE}/.." && pwd)"
+bash "${ROOT}/scripts/setup_venv.sh" "${HERE}/.venv" "${HERE}/requirements.txt"

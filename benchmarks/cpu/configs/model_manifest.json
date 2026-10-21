@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "benchmark_note": "The public artifact revisions below were resolved on 2026-08-25. Replace them with the revisions used in the manuscript experiments before publishing a resource table.",
+  "benchmark_note": "Pinned public artifact revisions used for the camera-ready controlled CPU/FLOP diagnostic. This synthetic diagnostic is not a UEA accuracy or end-to-end deployment benchmark.",
   "models": [
     {
       "name": "moment-small",

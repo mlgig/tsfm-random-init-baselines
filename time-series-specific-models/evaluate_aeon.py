@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Evaluate ROCKET, Hydra, or QUANT on UEA .ts train/test files.
 
-The classifiers receive the archive's native multivariate arrays directly:
-no resampling, channel pooling, or external standardisation is applied.
+Equal-length collections are passed through unchanged.  The four unequal-
+length UEA collections are right-zero-padded to one train/test maximum length
+before aeon, whose three selected classifiers do not support ragged input.
+No resampling, channel pooling, or external standardisation is applied.
 """
 
 from __future__ import annotations
@@ -24,6 +26,13 @@ from aeon.datasets import load_from_ts_file
 from sklearn.metrics import accuracy_score
 from threadpoolctl import threadpool_limits
 import torch
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from common.uea import pad_train_test_to_common_length
 
 
 def parse_args() -> argparse.Namespace:
@@ -103,12 +112,14 @@ def load_dataset(directory: Path, dataset: str):
     test_path = directory / f"{dataset}_TEST.ts"
     x_train, y_train, meta_train = load_from_ts_file(train_path, return_meta_data=True)
     x_test, y_test, meta_test = load_from_ts_file(test_path, return_meta_data=True)
-    if not meta_train.get("equallength") or not meta_test.get("equallength"):
-        raise ValueError("unequal-length data are not supported by this runner")
     if meta_train.get("missing") or meta_test.get("missing"):
         raise ValueError("missing values are not supported by this runner")
-    x_train = np.ascontiguousarray(np.asarray(x_train, dtype=np.float32))
-    x_test = np.ascontiguousarray(np.asarray(x_test, dtype=np.float32))
+    padded_variable_length = not meta_train.get("equallength") or not meta_test.get("equallength")
+    if padded_variable_length:
+        x_train, x_test = pad_train_test_to_common_length(x_train, x_test)
+    else:
+        x_train = np.ascontiguousarray(np.asarray(x_train, dtype=np.float32))
+        x_test = np.ascontiguousarray(np.asarray(x_test, dtype=np.float32))
     if x_train.ndim != 3 or x_test.ndim != 3:
         raise ValueError(f"expected 3D [cases, channels, timepoints] arrays; got {x_train.shape}, {x_test.shape}")
     if x_train.shape[1:] != x_test.shape[1:]:
@@ -117,7 +128,10 @@ def load_dataset(directory: Path, dataset: str):
         raise ValueError("non-finite values are not supported by this runner")
     if not set(np.unique(y_test)).issubset(set(np.unique(y_train))):
         raise ValueError("test labels are not a subset of training labels")
-    return x_train, y_train, x_test, y_test
+    preprocessing = (
+        "right_zero_pad_to_train_test_maximum" if padded_variable_length else "none"
+    )
+    return x_train, y_train, x_test, y_test, preprocessing
 
 
 def version(name: str) -> str:
@@ -150,7 +164,9 @@ def main() -> int:
             failure_rows.append({"dataset": dataset, "reason": "dataset not found"})
             continue
         try:
-            x_train, y_train, x_test, y_test = load_dataset(available[dataset], dataset)
+            x_train, y_train, x_test, y_test, preprocessing = load_dataset(
+                available[dataset], dataset
+            )
             classifier, parameters = make_classifier(args.model, args.seed, args.n_jobs)
             with threadpool_limits(limits=args.n_jobs):
                 started = time.perf_counter()
@@ -169,6 +185,7 @@ def main() -> int:
                     "channels": x_train.shape[1],
                     "length": x_train.shape[2],
                     "n_classes": len(np.unique(y_train)),
+                    "preprocessing": preprocessing,
                     "accuracy": accuracy_score(y_test, prediction),
                     "fit_seconds": fit_seconds,
                     "predict_seconds": predict_seconds,

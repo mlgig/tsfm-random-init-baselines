@@ -1,34 +1,32 @@
-"""
-MOMENT Zero-Shot Evaluation on UEA Multivariate Time Series Datasets
-- Loads datasets using load_from_tsfile
-- Extracts features using MOMENT foundation model (pretrained OR random init via Xavier reset)
-- Evaluates with SVM (GridSearchCV), LogisticRegression, RidgeClassifier, RandomForest
-
-Random init uses reset_weights (Xavier uniform for Linear/Conv, ones+zeros for LayerNorm)
-— same strategy used for the Mantis random-init baseline, for fair comparison.
-"""
+"""MOMENT frozen-representation evaluation on UEA multivariate datasets."""
 
 import os
 import sys
+import json
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import warnings
 import argparse
 from pathlib import Path
 from tqdm import tqdm
 
 from torch.utils.data import Dataset, DataLoader
-from aeon.datasets import load_from_ts_file as aeon_load
-from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression, RidgeClassifierCV
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-
+from huggingface_hub import hf_hub_download
 from momentfm import MOMENTPipeline
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from common.downstream import PROBE_ORDER, evaluate_probes
+from common.uea import load_uea_collection, right_pad_collection
+
+
+MOMENT_REVISIONS = {
+    "MOMENT-1-small": "411e288267f82cce86296dbe4d6c8bc533cc162f",
+    "MOMENT-1-base": "5e44b0ea26376a176360f87831124e018f876d96",
+    "MOMENT-1-large": "ca58581bc7bea2ebed4e80dc0a3e4b8b609c6ecc",
+}
 
 warnings.filterwarnings("ignore")
 
@@ -45,69 +43,31 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 
-def reset_weights(m):
-    """
-    Re-initialize a module's weights randomly.
-    - Linear / Conv1d / Conv2d: Xavier uniform, bias zeroed
-    - LayerNorm: weight=1, bias=0
-    - BatchNorm: weight=1, bias=0 (running stats reset)
-    - Embedding: Xavier uniform
-    """
-    if isinstance(m, (nn.Linear, nn.Conv1d, nn.Conv2d)):
-        nn.init.xavier_uniform_(m.weight.data)
-        if m.bias is not None:
-            m.bias.data.zero_()
-    elif isinstance(m, nn.LayerNorm):
-        m.weight.data.fill_(1.0)
-        m.bias.data.zero_()
-    elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
-        m.weight.data.fill_(1.0)
-        m.bias.data.zero_()
-        m.running_mean.zero_()
-        m.running_var.fill_(1.0)
-    elif isinstance(m, nn.Embedding):
-        nn.init.xavier_uniform_(m.weight.data)
-
-
 # ═══════════════════════════════════════════════════════════
 # Data utilities
 # ═══════════════════════════════════════════════════════════
 
 def load_from_tsfile(file_path):
-    """Load .ts file -> (X: [N, C, T] float32, y: [N] int64)."""
-    try:
-        X, y = aeon_load(str(file_path), return_type="numpy3d")
-        X = np.array(X, dtype=np.float32)
-        unique = np.unique(y)
-        lmap = {l: i for i, l in enumerate(unique)}
-        return X, np.array([lmap[l] for l in y], dtype=np.int64)
-    except Exception:
-        from sktime.datasets import load_from_ts_file as sk_load
-        X_df, y = sk_load(str(file_path))
-        N, C = X_df.shape
-        T = len(X_df.iloc[0, 0])
-        X_np = np.zeros((N, C, T), dtype=np.float32)
-        for i in range(N):
-            for c in range(C):
-                s = X_df.iloc[i, c]
-                v = s.values if hasattr(s, "values") else np.asarray(s, dtype=np.float32)
-                L = min(len(v), T)
-                X_np[i, c, :L] = v[:L]
-        unique = np.unique(y)
-        lmap = {l: i for i, l in enumerate(unique)}
-        return X_np, np.array([lmap[l] for l in y], dtype=np.int64)
+    """Load a .ts split, keeping a ragged UEA collection until context shaping."""
+    return load_uea_collection(str(file_path))
+
+
+def encode_train_test_labels(train_labels, test_labels):
+    """Encode labels with one map derived from training labels only."""
+    classes = np.unique(train_labels)
+    label_map = {label: index for index, label in enumerate(classes)}
+    unknown = set(np.asarray(test_labels)) - set(classes)
+    if unknown:
+        raise ValueError(f"test labels not present in training labels: {sorted(unknown)!r}")
+    return (
+        np.asarray([label_map[label] for label in train_labels], dtype=np.int64),
+        np.asarray([label_map[label] for label in test_labels], dtype=np.int64),
+    )
 
 
 def pad_or_truncate(X, target_len=512):
-    """Pad with zeros or truncate to target_len along time axis."""
-    N, C, T = X.shape
-    if T == target_len:
-        return X
-    elif T < target_len:
-        pad = np.zeros((N, C, target_len - T), dtype=X.dtype)
-        return np.concatenate([X, pad], axis=2)
-    else:
-        return X[:, :, :target_len]
+    """Right-pad/truncate every UEA case to MOMENT's fixed context length."""
+    return right_pad_collection(X, target_length=target_len)
 
 
 class TSDataset(Dataset):
@@ -150,83 +110,55 @@ def get_embeddings(model, dataloader, device):
 # Classifiers
 # ═══════════════════════════════════════════════════════════
 
-def get_classifiers():
-    classifiers = {}
-
-    classifiers["SVM"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("svm", SVC(kernel="rbf", random_state=42))
-        ]),
-        "param_grid": {
-            "svm__C": [0.01, 0.1, 1.0, 10.0, 100.0],
-            "svm__gamma": ["scale", "auto"],
-        },
-        "use_gridsearch": False,
-    }
-
-    # Logistic Regression with GridSearchCV
-    classifiers["LogReg"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("logreg", LogisticRegression(max_iter=2000, random_state=42))
-        ]),
-        "param_grid": {
-            "logreg__C": [0.01, 0.1, 1.0, 10.0, 100.0],
-        },
-        "use_gridsearch": True,
-    }
-
-    # RidgeClassifierCV
-    classifiers["Ridge"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("ridge", RidgeClassifierCV(alphas=np.logspace(-3, 3, 10)))
-        ]),
-        "param_grid": None,
-        "use_gridsearch": False,
-    }
-
-    # Random Forest
-    classifiers["RF"] = {
-        "pipeline": Pipeline([
-            ("scaler", StandardScaler()),
-            ("rf", RandomForestClassifier(n_estimators=200, random_state=42))
-        ]),
-        "param_grid": None,
-        "use_gridsearch": False,
-    }
-
-    return classifiers
-
-
 # ═══════════════════════════════════════════════════════════
 # Evaluation
 # ═══════════════════════════════════════════════════════════
 
-def build_moment(hf_id, n_channels, num_class, init, seed, device):
-    """Build a MOMENT model with either pretrained or random-init weights."""
-    model = MOMENTPipeline.from_pretrained(
-        hf_id,
-        model_kwargs={
-            "task_name": "classification",
-            "n_channels": n_channels,
-            "num_class": num_class,
-        },
+def load_moment_config(hf_id: str, revision: str) -> dict:
+    """Fetch the pinned architecture JSON required by ``momentfm==0.1.4``."""
+    config_path = hf_hub_download(
+        repo_id=hf_id,
+        filename="config.json",
+        revision=revision,
     )
-    model.init()  # initialize classification head
+    with open(config_path, encoding="utf-8") as config_file:
+        return json.load(config_file)
 
-    if init == "random":
-        # Seed right before reset so the same seed -> same random weights
+
+def build_moment(hf_id, revision, n_channels, num_class, init, seed, device):
+    """Build an architecture-matched MOMENT encoder.
+
+    ``momentfm==0.1.4`` requires the model repository's ``config.json`` to be
+    supplied explicitly to ``from_pretrained``. For random initialization we
+    download only that pinned architecture JSON, seed, and construct a new
+    pipeline. Thus the final encoder is initialized by MOMENT/PyTorch's
+    official construction path and contains no checkpoint parameters or
+    buffers.
+    """
+    model_kwargs = {
+        "task_name": "classification",
+        "n_channels": n_channels,
+        "num_class": num_class,
+    }
+    config = load_moment_config(hf_id, revision)
+    if init == "pretrained":
+        model = MOMENTPipeline.from_pretrained(
+            hf_id,
+            revision=revision,
+            config=config,
+            model_kwargs=model_kwargs,
+        )
+        model.init()
+    else:
         set_seed(seed)
-        model.apply(reset_weights)
+        model = MOMENTPipeline(config, model_kwargs=dict(model_kwargs))
+        model.init()
 
-    model = model.to(device).float().eval()
-    return model
+    return model.to(device).float().eval()
 
 
 def evaluate_dataset(
-    dataset_name, data_path, hf_id, init, seed, device,
+    dataset_name, data_path, hf_id, revision, init, seed, device,
     target_len=512, batch_size=8
 ):
     """Evaluate MOMENT on a single dataset. Returns dict of classifier -> accuracy."""
@@ -239,18 +171,19 @@ def evaluate_dataset(
         return None
 
     # Load data
-    X_train, y_train = load_from_tsfile(train_file)
-    X_test, y_test = load_from_tsfile(test_file)
+    X_train, train_labels = load_from_tsfile(train_file)
+    X_test, test_labels = load_from_tsfile(test_file)
+    y_train, y_test = encode_train_test_labels(train_labels, test_labels)
+
+    # Pad/truncate every raw or ragged UEA case to the model context length.
+    X_train = pad_or_truncate(X_train, target_len)
+    X_test = pad_or_truncate(X_test, target_len)
 
     n_channels = X_train.shape[1]
     num_class = len(np.unique(y_train))
 
     # Build a fresh model per dataset (because n_channels / num_class vary)
-    model = build_moment(hf_id, n_channels, num_class, init, seed, device)
-
-    # Pad/truncate to context length
-    X_train = pad_or_truncate(X_train, target_len)
-    X_test = pad_or_truncate(X_test, target_len)
+    model = build_moment(hf_id, revision, n_channels, num_class, init, seed, device)
 
     train_loader = DataLoader(TSDataset(X_train, y_train), batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(TSDataset(X_test, y_test), batch_size=batch_size, shuffle=False)
@@ -259,36 +192,15 @@ def evaluate_dataset(
     Z_train, y_train_emb = get_embeddings(model, train_loader, device)
     Z_test, y_test_emb = get_embeddings(model, test_loader, device)
 
-    # Evaluate classifiers
-    classifiers = get_classifiers()
+    probe_results = evaluate_probes(Z_train, y_train_emb, Z_test, y_test_emb)
     results = {}
-
-    for clf_name, clf_config in classifiers.items():
-        try:
-            if clf_config["use_gridsearch"]:
-                gs = GridSearchCV(
-                    clf_config["pipeline"],
-                    clf_config["param_grid"],
-                    cv=5,
-                    scoring="accuracy",
-                    n_jobs=-1,
-                    refit=True,
-                )
-                gs.fit(Z_train, y_train_emb)
-                y_pred = gs.predict(Z_test)
-                acc = np.mean(y_test_emb == y_pred)
-                print(f"  {clf_name}: {acc:.4f} (best params: {gs.best_params_})")
-            else:
-                pipe = clf_config["pipeline"]
-                pipe.fit(Z_train, y_train_emb)
-                y_pred = pipe.predict(Z_test)
-                acc = np.mean(y_test_emb == y_pred)
-                print(f"  {clf_name}: {acc:.4f}")
-
-            results[clf_name] = acc
-        except Exception as e:
-            print(f"  {clf_name}: FAILED — {e}")
-            results[clf_name] = np.nan
+    for clf_name in PROBE_ORDER:
+        probe = probe_results[clf_name]
+        results[clf_name] = probe["accuracy"]
+        if probe["error"]:
+            print(f"  {clf_name}: FAILED — {probe['error']}")
+        else:
+            print(f"  {clf_name}: {probe['accuracy']:.4f} (best params: {probe['best_params']})")
 
     # Cleanup
     del model
@@ -306,7 +218,7 @@ def main():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/pinar/workspace_pinar/moment/Multivariate_ts_length_fixed",
+        required=True,
         help="Path to UEA dataset root (each subdirectory = one dataset)",
     )
     parser.add_argument("--device", type=str, default="cuda")
@@ -324,7 +236,7 @@ def main():
         type=str,
         default="random",
         choices=["pretrained", "random"],
-        help="Use pretrained weights or random init (Xavier reset_weights)",
+        help="Use released pretrained weights or a fresh, seeded MOMENT initialization",
     )
     parser.add_argument(
         "--seed",
@@ -340,6 +252,12 @@ def main():
         help="Which MOMENT size to use",
     )
     parser.add_argument(
+        "--revision",
+        type=str,
+        default=None,
+        help="Hugging Face checkpoint revision (defaults to the camera-ready pinned revision)",
+    )
+    parser.add_argument(
         "--output",
         type=str,
         default=None,
@@ -348,9 +266,10 @@ def main():
     args = parser.parse_args()
 
     hf_id = f"AutonLab/{args.model}"
-    print(f"Using {hf_id} ({args.init} init, seed={args.seed})\n")
+    revision = args.revision or MOMENT_REVISIONS[args.model]
+    print(f"Using {hf_id}@{revision} ({args.init} init, seed={args.seed})\n")
 
-    # Global seed (per-dataset reset_weights also re-seeds before applying)
+    # The random condition reseeds immediately before each fresh construction.
     set_seed(args.seed)
 
     # ─── Discover datasets ───
@@ -373,6 +292,7 @@ def main():
                 ds_name,
                 data_path=args.data_path,
                 hf_id=hf_id,
+                revision=revision,
                 init=args.init,
                 seed=args.seed,
                 device=args.device,
@@ -399,7 +319,9 @@ def main():
         df = pd.DataFrame(all_results).T
         df.index.name = "Dataset"
         df.loc["MEAN"] = df.mean()
-        df.to_csv(args.output, float_format="%.4f")
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(output_path, float_format="%.17g")
         print(f"\nResults saved to {args.output}")
         print(f"\n{'='*60}")
         print(df.to_string(float_format=lambda x: f"{x:.4f}"))
