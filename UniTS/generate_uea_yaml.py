@@ -10,7 +10,6 @@ does not inspect feature values or select a downstream classifier.
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +17,9 @@ import yaml
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+UNITS_UNAVAILABLE_DATASETS = frozenset(
+    {"DuckDuckGeese", "InsectWingbeat", "PEMS-SF"}
+)
 
 
 def _paper_datasets(*, include_unavailable: bool) -> list[str]:
@@ -30,9 +32,7 @@ def _paper_datasets(*, include_unavailable: bool) -> list[str]:
     if include_unavailable:
         return names
 
-    manifest = json.loads((REPOSITORY_ROOT / "protocol" / "paper_manifest.json").read_text())
-    unavailable = set(manifest["instances"]["UniTS"]["unavailable"])
-    return [name for name in names if name not in unavailable]
+    return [name for name in names if name not in UNITS_UNAVAILABLE_DATASETS]
 
 
 def _read_split(path: Path) -> tuple[int, int, Any]:

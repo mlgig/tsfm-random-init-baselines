@@ -1,6 +1,0 @@
-# Encoder seeds used for every random-initialization condition in the paper.
-0
-7
-42
-123
-2026
