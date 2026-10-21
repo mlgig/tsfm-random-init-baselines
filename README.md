@@ -32,11 +32,9 @@ foundation models without requiring large-scale pretraining. Together, these
 results motivate a more careful assessment of the computational cost of
 large-scale pretraining relative to its downstream benefit for MTSC and support
 the systematic inclusion of architecture-matched random initialization and
-non-pretrained baselines in future evaluations. Code, experiment
-configurations, and complete results are available in a repository.[^2]
+non-pretrained baselines in future evaluations.
 
 [^1]: [UEA Multivariate Time Series Classification Archive](https://www.timeseriesclassification.com/)
-[^2]: [Code repository](https://github.com/mlgig/tsfm-random-init-baselines.git)
 
 ## Data
 
