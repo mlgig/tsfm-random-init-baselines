@@ -32,7 +32,7 @@ linear interpolation step to reach `--target_len` (default: `512`). Random and
 pretrained runs use the same steps.
 
 Run the random setting with all paper seeds: `0`, `7`, `42`, `123`, and
-`2026`. Keep the full-precision CSV files for paper aggregation.
+`2026`.
 
 ## Source code
 

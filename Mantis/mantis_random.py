@@ -123,7 +123,7 @@ def main():
         "--revision",
         type=str,
         default=None,
-        help="Hugging Face checkpoint revision (defaults to the camera-ready pinned revision)",
+        help="Hugging Face checkpoint revision (defaults to the pinned revision used for the paper)",
     )
     parser.add_argument(
         "--output",

@@ -10,10 +10,8 @@ git -C external/nutime checkout 9acdd3d0e82df0914217ef752fa3b95ec82cd960
 ```
 
 The runner checks this exact version and stops if tracked source files changed.
-The checksum for the suggested released checkpoint is in
-`benchmarks/cpu/configs/model_manifest.json`. The paper does not give a
-checkpoint hash for the UEA accuracy run, so save the exact artifact used with
-any regenerated results.
+The paper does not give a checkpoint hash for the UEA accuracy run, so save the
+exact artifact used with any regenerated results.
 
 ## Setup and run
 
@@ -34,8 +32,8 @@ a checkpoint. Set `NUTIME_REPO=/another/checkout` to use another checkout at
 the same fixed version.
 
 `--output` saves the executed notebook. `--results` saves a full-precision CSV
-with one row per dataset for the aggregation tool. Before running the notebook, the
-configurator adds absolute paths for the data, result, and source checkout.
+with one row per dataset. Before running the notebook, the configurator adds
+absolute paths for the data, result, and source checkout.
 
 ## Feature extraction
 

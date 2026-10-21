@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "source": "Random Initialization as a Baseline for Time Series Foundation Models, camera-ready, Appendix B (Table 5)",
+  "source": "Random Initialization as a Baseline for Time Series Foundation Models, Appendix B (Table 5)",
   "uea_dataset_count": 30,
   "random_encoder_seeds": [0, 7, 42, 123, 2026],
   "common_cross_method_exclusions": [

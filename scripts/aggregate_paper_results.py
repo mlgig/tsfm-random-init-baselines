@@ -430,7 +430,7 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         type=int,
         default=list(DEFAULT_SEEDS),
-        help="Random encoder seeds; defaults to the five camera-ready seeds.",
+        help="Random encoder seeds; defaults to the five paper seeds.",
     )
     parser.add_argument("--bootstrap-repetitions", type=int, default=10_000)
     parser.add_argument("--bootstrap-seed", type=int, default=2026)

@@ -6,130 +6,72 @@ workshop.
 
 ## Abstract
 
-Time series foundation models are often used with pre-trained weights. This
-work asks a simple question: how much do those weights help compared with the
-same model built from random weights? We test MOMENT, Mantis, UniTS, and
-NuTime on multivariate time series classification datasets. We use frozen
-model features and the same downstream classifiers for both settings. We also
-compare the models with ROCKET, Hydra, and QUANT.
+Time series foundation models rely on self-supervised objectives, such as
+masked reconstruction or contrastive learning, to build reusable
+representations for downstream tasks such as multivariate time series
+classification (MTSC). In this work, we test how much pretrained weights
+improve over a baseline that requires no pretraining: the same architecture
+with randomly initialized weights. We evaluate seven publicly released
+instances from four time series foundation model families on the UEA MTSC
+archive[^1], with per-model exclusions where evaluation cannot be completed due
+to computational constraints. For each instance, we compare the pretrained
+weights against five randomly initialized variants using four downstream
+classifiers on frozen representations: two linear classifiers (ridge classifier
+and logistic regression) and two nonlinear classifiers (RBF SVM and random
+forest), yielding 183 paired dataset-level comparisons. Pretrained variants
+achieve higher mean accuracy across all seven instances, but the mean advantage
+is modest, ranging from 1.43 to 5.19 percentage points, with an overall average
+gain of 2.58 percentage points. Under per-instance Wilcoxon signed-rank tests,
+three of seven raw p-values fall below 0.05, but after Holm correction for
+multiple comparisons, only NuTime remains statistically significant. A
+secondary pooled analysis across all 183 pairs yields p < 0.001, while the
+corrected per-instance tests remain the primary statistical evidence. We
+further compare against three established time-series-specific classifiers:
+ROCKET, Hydra, and Quant, which remain competitive with the pretrained
+foundation models without requiring large-scale pretraining. Together, these
+results motivate a more careful assessment of the computational cost of
+large-scale pretraining relative to its downstream benefit for MTSC and support
+the systematic inclusion of architecture-matched random initialization and
+non-pretrained baselines in future evaluations. Code, experiment
+configurations, and complete results are available in a repository.[^2]
 
-## Resources
-
-- Paper link: coming soon.
-- [UEA Multivariate Time Series Classification Archive](https://www.timeseriesclassification.com/aeon-toolkit/Archives/Multivariate2018_ts.zip)
-- [Data notes](data/README.md)
-
-## Repository Structure
-
-```text
-MOMENT/                       MOMENT Small, Base, and Large
-Mantis/                       Mantis 8M and MantisV2
-UniTS/                        UniTS runner and source wrapper
-NuTime/                       NuTime notebook runner
-time-series-specific-models/  ROCKET, Hydra, and QUANT
-data/                         UEA download script and dataset lists
-common/                       Shared data and classifier code
-scripts/                      Setup, validation, and result tools
-benchmarks/cpu/               Separate CPU and FLOP checks
-```
-
-## Methods
-
-### Foundation Models
-
-- **MOMENT**: Small, Base, and Large models.
-- **Mantis**: Mantis 8M and MantisV2.
-- **UniTS**: runs from a fixed version of the official source code.
-- **NuTime**: runs from a fixed version of the official source code.
-
-Each model has a pre-trained run and a random-weight run. Random runs use the
-five seeds from the paper: `0`, `7`, `42`, `123`, and `2026`.
-
-### Time Series Methods
-
-- **ROCKET**
-- **Hydra**
-- **QUANT**
-
-These methods run through the aeon library.
+[^1]: [UEA Multivariate Time Series Classification Archive](https://www.timeseriesclassification.com/)
+[^2]: [Code repository](https://github.com/mlgig/tsfm-random-init-baselines.git)
 
 ## Data
 
-Download the official UEA archive once:
+Download the UEA multivariate archive once:
 
 ```bash
 bash data/download_uea.sh
 export UEA_ROOT="$PWD/data/UEA"
 ```
 
-The archive is about 846 MiB and contains 30 datasets. The expected layout is:
+The archive contains 30 datasets. Its expected layout is:
 
 ```text
 $UEA_ROOT/<Dataset>/<Dataset>_TRAIN.ts
 $UEA_ROOT/<Dataset>/<Dataset>_TEST.ts
 ```
 
-Some datasets have time series with different lengths. The runners add zeros
-at the end only when a model needs a fixed input length. They use the same
-data path for pre-trained and random runs.
+## Run experiments
 
-The original experiment also used a local processed-data folder that is not in
-this repository. Keep new result files if you want to compare them with the
-published tables.
+Each model folder has setup and run instructions:
 
-## Usage
+- [MOMENT](MOMENT/README.md)
+- [Mantis](Mantis/README.md)
+- [UniTS](UniTS/README.md)
+- [NuTime](NuTime/README.md)
+- [ROCKET, Hydra, and QUANT](time-series-specific-models/README.md)
 
-Each method has its own README with setup and run commands. The usual steps
-are:
+Run every random setting with seeds `0`, `7`, `42`, `123`, and `2026`, then run
+the matching pretrained setting. Each runner writes its output to the path
+given on the command line.
 
-1. Download the UEA data.
-2. Run `setup.sh` in the method folder.
-3. Run the method for each random seed and once with pre-trained weights.
+## Original repositories
 
-For example, to run MOMENT Base with random weights:
-
-```bash
-cd MOMENT
-bash setup.sh
-bash run.sh --data_path "$UEA_ROOT" --model MOMENT-1-base \
-  --init random --seed 0 --device cuda \
-  --output ../results/MOMENT-Base/random_seed0.csv
-```
-
-The [MOMENT](MOMENT/README.md), [Mantis](Mantis/README.md),
-[UniTS](UniTS/README.md), [NuTime](NuTime/README.md), and
-[time-series methods](time-series-specific-models/README.md) READMEs have
-more details.
-
-## Results
-
-The original per-seed UEA result files are not stored in this repository. Once
-you have new run outputs, use the result tool below to build paper-style
-summary tables:
-
-```bash
-python scripts/aggregate_paper_results.py \
-  --input-root /path/to/paper-input \
-  --output-dir results/paper-summary
-```
-
-See [the result template](templates/paper-results/README.md) for the expected
-file layout.
-
-## References and Original Repositories
-
-- [UEA archive](https://www.timeseriesclassification.com/)
 - [MOMENT](https://github.com/moment-timeseries-foundation-model/moment)
 - [Mantis](https://github.com/vfeofanov/mantis)
 - [UniTS](https://github.com/mims-harvard/UniTS)
 - [NuTime](https://github.com/chenguolin/NuTime)
 - [aeon](https://github.com/aeon-toolkit/aeon)
-
-## Citation
-
-Citation details will be added when the paper is publicly available.
-
-## License
-
-Please check the licenses of the original model repositories before using
-their code or weights.

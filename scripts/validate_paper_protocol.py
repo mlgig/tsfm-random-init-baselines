@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the tracked camera-ready dataset and coverage manifests."""
+"""Validate the tracked paper dataset and coverage manifests."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def main() -> int:
         expected_total += available
     if expected_total != 183:
         raise ValueError(f"expected 183 paired observations, found {expected_total}")
-    print("Camera-ready protocol manifests are internally consistent.")
+    print("Paper dataset and coverage manifests are internally consistent.")
     return 0
 
 

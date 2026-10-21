@@ -1,6 +1,6 @@
 """Generate an explicit UniTS classification-task YAML from raw UEA splits.
 
-The camera-ready paper names the UEA collections but does not preserve the
+The paper names the UEA collections but does not preserve the
 historical UniTS task recipe.  This helper derives only structural metadata
 from the public ``.ts`` files: channel count, the maximum sequence length
 across the official TRAIN/TEST pair, and the number of training labels.  It

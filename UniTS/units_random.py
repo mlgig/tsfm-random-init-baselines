@@ -175,7 +175,7 @@ def extract_features(model, loader, device, feat_store, task_id=0):
 
 
 # ═══════════════════════════════════════════════════════════
-# Classifiers (the shared camera-ready protocol)
+# Classifiers (the shared paper protocol)
 # ═══════════════════════════════════════════════════════════
 
 def fit_and_score(tr_x, tr_y, te_x, te_y):

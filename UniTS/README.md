@@ -11,10 +11,9 @@ git -C external/units checkout f8e5dfc71f6799164f30b090240a74ee70da01ca
 ```
 
 The wrapper and launcher check this exact version and stop if tracked source
-files changed. The checksum for the released checkpoint used in the CPU diagnostic
-is in `benchmarks/cpu/configs/model_manifest.json`. The paper does not name an
-exact UEA task YAML or checkpoint SHA. Save the generated YAML and checkpoint
-identifier with any regenerated results.
+files changed. The paper does not name an exact UEA task YAML or checkpoint
+SHA. Save the generated YAML and checkpoint identifier with any regenerated
+results.
 
 ## Setup and run
 
@@ -34,10 +33,9 @@ bash run.sh \
 `generate_uea_yaml.py` reads the official raw TRAIN and TEST files. It records
 the channel count, shared maximum series length, and number of training
 classes for each collection. By default, it creates a recipe for the 27
-UniTS-eligible paper datasets. It leaves out DuckDuckGeese, InsectWingbeat,
-and PEMS-SF, as listed in the paper manifest. Use
-`--include-paper-unavailable` only for a test recipe with all 30
-datasets; do not use it to change the paper subset without saying so.
+collections used for UniTS. It leaves out DuckDuckGeese, InsectWingbeat, and
+PEMS-SF. Use `--include-paper-unavailable` to generate a recipe with all 30
+collections.
 
 For a pretrained run, add `--init pretrained` and
 `--ckpt /absolute/path/to/checkpoint.pth`. The wrapper resolves `--yaml`,

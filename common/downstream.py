@@ -1,4 +1,4 @@
-"""The frozen-representation probe protocol reported in the camera-ready paper.
+"""The frozen-representation probe protocol reported in the paper.
 
 Every foundation-model runner uses this module so that classifier selection is
 identical across model families, conditions, datasets, and random encoder

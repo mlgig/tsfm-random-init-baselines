@@ -35,7 +35,7 @@ to the MOMENT context length. The default `--target_len` is `512`. This is the
 same for random and pretrained runs.
 
 Run the random setting with all paper seeds: `0`, `7`, `42`, `123`, and
-`2026`. Keep the full-precision CSV files for later aggregation.
+`2026`.
 
 ## Source code
 
