@@ -5,13 +5,11 @@ __pycache__/
 **/runs/
 
 external/*
-!external/.gitkeep
 
 data/raw/
 data/UEA/
 
 results/*
-!results/.gitkeep
 
 .hf-cache/
 *.log
