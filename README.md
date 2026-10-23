@@ -1,8 +1,8 @@
 # Random Initialization as a Baseline for Time Series Foundation Models
 
-This repository contains the code for *Random Initialization as a Baseline for
-Time Series Foundation Models*, accepted at the NeurIPS 2026 TS-LIMITS
-workshop.
+This repository contains the code for *[Random Initialization as a Baseline for Time Series Foundation Models](https://arxiv.org/abs/2610.30950)*, accepted at the NeurIPS 2026 TS-LIMITS workshop.
+
+
 
 ## Abstract
 
@@ -79,11 +79,12 @@ given on the command line.
 
 ```bibtex
 @misc{pinar2026randominit,
-   title={Random Initialization as a Baseline for Time Series Foundation Models},
-   author={Pinar Sungu Isiacik and Georgiana Ifrim},
-   year={2026},
-   conference={{NeurIPS} 2026 Workshop on {TS-LIMITS}},
-   eprint={tba},
-   archivePrefix={arXiv},
-   primaryClass={cs.LG}
+  title={Random Initialization as a Baseline for Time Series Foundation Models},
+  author={Pinar Sungu Isiacik and Georgiana Ifrim},
+  year={2026},
+  conference={{NeurIPS} 2026 Workshop on {TS-LIMITS}},
+  eprint={2610.30950},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG},
+  url={https://arxiv.org/abs/2610.30950}
 }
